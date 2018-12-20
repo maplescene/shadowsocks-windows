@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Windows.Forms;
 using Shadowsocks.Model;
 using Shadowsocks.Util.SystemProxy;
 
@@ -11,7 +12,7 @@ namespace Shadowsocks.Controller
             return value.ToString("yyyyMMddHHmmssfff");
         }
 
-        public static void Update(Configuration config, bool forceDisable, PACServer pacSrv)
+        public static void Update(Configuration config, bool forceDisable, PACServer pacSrv, bool noRetry = false)
         {
             bool global = config.global;
             bool enabled = config.enabled;
@@ -27,7 +28,7 @@ namespace Shadowsocks.Controller
                 {
                     if (global)
                     {
-                        Sysproxy.SetIEProxy(true, true, "127.0.0.1:" + config.localPort.ToString(), "");
+                        Sysproxy.SetIEProxy(true, true, "127.0.0.1:" + config.localPort.ToString(), null);
                     }
                     else
                     {
@@ -40,17 +41,30 @@ namespace Shadowsocks.Controller
                         {
                             pacUrl = pacSrv.PacUrl;
                         }
-                        Sysproxy.SetIEProxy(true, false, "", pacUrl);
+                        Sysproxy.SetIEProxy(true, false, null, pacUrl);
                     }
                 }
                 else
                 {
-                    Sysproxy.SetIEProxy(false, false, "", "");
+                    Sysproxy.SetIEProxy(false, false, null, null);
                 }
             }
             catch (ProxyException ex)
             {
                 Logging.LogUsefulException(ex);
+                if (ex.Type != ProxyExceptionType.Unspecific && !noRetry)
+                {
+                    var ret = MessageBox.Show(I18N.GetString("Error occured when process proxy setting, do you want reset current setting and retry?"), I18N.GetString("Shadowsocks"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                    if (ret == DialogResult.Yes)
+                    {
+                        Sysproxy.ResetIEProxy();
+                        Update(config, forceDisable, pacSrv, true);
+                    }
+                }
+                else
+                {
+                    MessageBox.Show(I18N.GetString("Unrecoverable proxy setting error occured, see log for detail"), I18N.GetString("Shadowsocks"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
     }
